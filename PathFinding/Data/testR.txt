@@ -1,0 +1,2 @@
+Robot 1: Start (0, 0) End (4, 6)
+Robot 2: Start (0, 8) End (3, 9)
