@@ -1,1 +1,0 @@
-best_moves[i] = min(possible_moves, key=lambda move: heuristic(i, move))
