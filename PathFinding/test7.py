@@ -182,7 +182,12 @@ def plan_robot_movements(grid, starts, goals, dynamic_agents):
     return robot_paths
 
 
-read_input("Data/data1.txt", "Data/Robots1.txt", "Data/Agent1.txt")
+num = int(input("Enter test number: "))
+data_name = f"Data/data{num}.txt"
+robots_name = f"Data/Robots{num}.txt"
+agents_name = f"Data/Agent{num}.txt"
+
+read_input(data_name, robots_name, agents_name)
 
 # Plan movements for all robots
 robot_paths = plan_robot_movements(grid, starts, goals, dynamic_agents)
