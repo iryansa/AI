@@ -1,0 +1,6 @@
+apple
+banana
+123
+pear
+grape
+$$$
