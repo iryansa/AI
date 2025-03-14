@@ -121,7 +121,7 @@ def local_beam_search(graph, heuristics, preassigned_colors, max_node, k=3, max_
 
 # Load dataset
 graph, heuristics, max_node = load_graph("hypercube_dataset.txt")
-preassigned_colors = {0: 0, 1: 1}  # Example preassigned colors
+preassigned_colors = {0: 0, 1: 7, 3: 11, 50: 4, 308: 5, 576: 6}  # Example preassigned colors
 
 # Run Local Beam Search
 final_coloring, max_colors = local_beam_search(graph, heuristics, preassigned_colors, max_node)
