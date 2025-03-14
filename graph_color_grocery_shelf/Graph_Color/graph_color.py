@@ -191,6 +191,9 @@ else:
 # Generate random preassigned colors
 preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), min(5, num_nodes))}
 print("Preassigned colors:", preassigned_colors)
+
+print("Total Vertices:", num_nodes)
+print("Total Edges:", sum(len(neighbors) for neighbors in graph.values()) // 2)
 # Run Local Beam Search
 final_coloring, num_colors = local_beam_search(graph, heuristics, preassigned_colors)
 
