@@ -1,2 +1,2 @@
 # AI
-Artificial Intelligence course assignments
+Artificial Intelligence course assignments and labs
