@@ -175,13 +175,28 @@ def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations
 
 # Load dataset
 graph, heuristics, max_node = load_graph("hypercube_dataset.txt")
-preassigned_colors = {0: 0, 1: 1}  # Example preassigned colors
+# Determine the number of nodes
+num_nodes = max_node + 1
 
+# Set the maximum color based on the number of nodes
+if num_nodes < 500:
+    max_color = 5
+elif num_nodes < 1500:
+    max_color = 10
+elif num_nodes < 3000:
+    max_color = 20
+else:
+    max_color = 30  # Default max color for larger graphs
+
+# Generate random preassigned colors
+preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), min(5, num_nodes))}
+print("Preassigned colors:", preassigned_colors)
 # Run Local Beam Search
 final_coloring, num_colors = local_beam_search(graph, heuristics, preassigned_colors)
 
 # Print results
 print(f"Solution found with {num_colors} colors")
 print("Final coloring:")
+print("Node\t:\tColor")
 for node in sorted(final_coloring):
-    print(f"Node {node} has color {final_coloring[node]}")
+    print(node, "\t:\t", final_coloring[node])
