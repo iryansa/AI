@@ -2,15 +2,15 @@ import random
 from collections import defaultdict
 import heapq
 import time
+import threading
 
+# Load graph function remains unchanged
 def load_graph(filename):
-    """Load graph from file."""
     graph = defaultdict(list)
     heuristics = {}
     max_node = 0
-
+    
     with open(filename, 'r') as file:
-        # Skip header line
         header = file.readline()
         
         for line in file:
@@ -32,67 +32,48 @@ def load_graph(filename):
     return graph, heuristics, max_node
 
 def precompute_two_hop_neighbors(graph):
-    """Precompute two-hop neighbors for all nodes."""
     two_hop_neighbors = {}
-    for node in graph:
+    
+    def process_node(node):
         neighbors = set(graph[node])
         two_hop = set()
         for neighbor in neighbors:
             two_hop.update(graph[neighbor])
-        two_hop -= neighbors  # Remove direct neighbors
-        two_hop.discard(node)  # Remove self
+        two_hop -= neighbors
+        two_hop.discard(node)
         two_hop_neighbors[node] = two_hop
+    
+    if len(graph) > 100:
+        threads = []
+        for node in graph:
+            t = threading.Thread(target=process_node, args=(node,))
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+    else:
+        for node in graph:
+            process_node(node)
+    
     return two_hop_neighbors
 
-def initial_coloring(graph, two_hop_neighbors, preassigned_colors):
-    """Generate initial valid coloring."""
-    coloring = {}
-    # Sort nodes by degree descending
-    nodes = sorted(graph.keys(), key=lambda x: (-len(graph[x]), x))
-    
-    for node in nodes:
-        if node in preassigned_colors:
-            coloring[node] = preassigned_colors[node]
-            continue
-        
-        # Collect used colors from neighbors and two-hop neighbors
-        used_colors = set()
-        for neighbor in graph[node]:
-            if neighbor in coloring:
-                used_colors.add(coloring[neighbor])
-        for neighbor in two_hop_neighbors[node]:
-            if neighbor in coloring:
-                used_colors.add(coloring[neighbor])
-        
-        # Assign the smallest available color
-        color = 0
-        while color in used_colors:
-            color += 1
-        coloring[node] = color
-    
-    return coloring
-
 def heuristic_function(graph, coloring, two_hop_neighbors, heuristics):
-    """Evaluate the quality of a coloring."""
     conflicts = 0
     color_count = defaultdict(int)
     
-    # Count conflicts and color usage
     for node in graph:
         color = coloring[node]
         color_count[color] += 1
         
-        # Check adjacent nodes
         for neighbor in graph[node]:
             if coloring[node] == coloring[neighbor]:
                 conflicts += heuristics.get((node, neighbor), 1)
         
-        # Check two-hop nodes
         for neighbor in two_hop_neighbors[node]:
             if neighbor in coloring and coloring[node] == coloring[neighbor]:
-                conflicts += 2  # Higher penalty for two-hop conflicts
+                conflicts += 2  
     
-    # Calculate balance score
     if color_count:
         max_color = max(color_count.values())
         min_color = min(color_count.values())
@@ -100,49 +81,84 @@ def heuristic_function(graph, coloring, two_hop_neighbors, heuristics):
     else:
         balance_score = 0
     
-    # Total heuristic: conflicts + balance + number of colors
     return conflicts + balance_score + len(color_count)
 
-def get_successors(graph, coloring, two_hop_neighbors, preassigned_colors):
-    """Generate successor states by recoloring high-degree nodes."""
-    successors = []
-    # Identify high-degree nodes
-    high_degree_nodes = sorted(graph.keys(), key=lambda x: (-len(graph[x]), x))[:5]
+def initial_coloring(graph, two_hop_neighbors, preassigned_colors):
+    coloring = preassigned_colors.copy()
+    nodes = sorted(graph.keys(), key=lambda x: (-len(graph[x]), x))
+    lock = threading.Lock()
     
-    for node in high_degree_nodes:
+    def color_node(node):
         if node in preassigned_colors:
-            continue
-        
-        original_color = coloring[node]
+            return
         used_colors = set()
-        
-        # Collect used colors from neighbors and two-hop neighbors
         for neighbor in graph[node]:
             if neighbor in coloring:
                 used_colors.add(coloring[neighbor])
         for neighbor in two_hop_neighbors[node]:
             if neighbor in coloring:
                 used_colors.add(coloring[neighbor])
+        color = 0
+        while color in used_colors:
+            color += 1
+        with lock:
+            coloring[node] = color
+    
+    if len(graph) > 100:
+        threads = []
+        for node in nodes:
+            t = threading.Thread(target=color_node, args=(node,))
+            threads.append(t)
+            t.start()
         
-        # Generate possible new colors
-        possible_colors = []
-        for color in range(max(coloring.values()) + 2):
-            if color not in used_colors and color != original_color:
-                possible_colors.append(color)
-        
-        # Create new colorings
+        for t in threads:
+            t.join()
+    else:
+        for node in nodes:
+            color_node(node)
+    
+    return coloring
+
+def get_successors(graph, coloring, two_hop_neighbors, preassigned_colors):
+    successors = []
+    high_degree_nodes = sorted(graph.keys(), key=lambda x: (-len(graph[x]), x))[:5]
+    lock = threading.Lock()
+    
+    def process_node(node):
+        if node in preassigned_colors:
+            return
+        original_color = coloring[node]
+        used_colors = set()
+        for neighbor in graph[node]:
+            if neighbor in coloring:
+                used_colors.add(coloring[neighbor])
+        for neighbor in two_hop_neighbors[node]:
+            if neighbor in coloring:
+                used_colors.add(coloring[neighbor])
+        possible_colors = [c for c in range(max(coloring.values()) + 2) if c not in used_colors and c != original_color]
         for color in possible_colors:
             new_coloring = coloring.copy()
             new_coloring[node] = color
-            successors.append(new_coloring)
+            with lock:
+                successors.append(new_coloring)
+    
+    if len(graph) > 100:
+        threads = []
+        for node in high_degree_nodes:
+            t = threading.Thread(target=process_node, args=(node,))
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+    else:
+        for node in high_degree_nodes:
+            process_node(node)
     
     return successors
 
 def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations=100):
-    """Perform local beam search for graph coloring."""
     two_hop_neighbors = precompute_two_hop_neighbors(graph)
-    
-    # Generate initial states
     initial_state = initial_coloring(graph, two_hop_neighbors, preassigned_colors)
     states = [initial_state] * k
     
@@ -157,17 +173,10 @@ def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations
         if not new_states:
             break
         
-        # Evaluate new states
-        new_states_with_scores = []
-        for new_state in new_states:
-            score = heuristic_function(graph, new_state, two_hop_neighbors, heuristics)
-            new_states_with_scores.append((new_state, score))
-        
-        # Select top k states
+        new_states_with_scores = [(state, heuristic_function(graph, state, two_hop_neighbors, heuristics)) for state in new_states]
         new_states_with_scores.sort(key=lambda x: x[1])
         states = [state for state, score in new_states_with_scores[:k]]
         
-        # Update best state
         current_best_score = new_states_with_scores[0][1] if new_states_with_scores else best_score
         if current_best_score < best_score:
             best_state, best_score = new_states_with_scores[0]
@@ -176,7 +185,6 @@ def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations
 
 # Load dataset
 graph, heuristics, max_node = load_graph("hypercube_dataset.txt")
-# Determine the number of nodes
 num_nodes = max_node + 1
 
 # Set the maximum color based on the number of nodes
@@ -188,36 +196,23 @@ elif num_nodes < 3000:
     max_color = 20
 else:
     max_color = 30  # Default max color for larger graphs
-
-# Generate random preassigned colors
-# num_preassigned = max(1, num_nodes // 10)  # Ensure at least one preassigned color
-# preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), num_preassigned)}
-# print("Preassigned colors:", preassigned_colors)
-
-# Generate random preassigned colors
+# preassigned_colors = {node: random.randint(0, 5) for node in random.sample(range(num_nodes), max(1, num_nodes // 10))}
+# # Generate random preassigned colors
 preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), min(5, num_nodes))}
 print("Preassigned colors:", preassigned_colors)
 
 print("Total Vertices:", num_nodes)
 print("Total Edges:", sum(len(neighbors) for neighbors in graph.values()) // 2)
-# calculate start time
-start_time = time.time()
 
-# Run Local Beam Search
+start_time = time.time()
 final_coloring, num_colors = local_beam_search(graph, heuristics, preassigned_colors)
 
-
-
-# Print results
 print(f"Solution found with {num_colors} colors")
 print("Final coloring:")
 print("Node\t:\tColor")
 for node in sorted(final_coloring):
     print(node, "\t:\t", final_coloring[node])
 
-# calculate end time
 end_time = time.time()
-# calculate the execution time in seconds
 execution_time = end_time - start_time
-# print the execution time
 print("Execution Time:", execution_time)
