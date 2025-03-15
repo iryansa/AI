@@ -7,7 +7,7 @@ shelves = {
     "S2": {"type": "lower", "capacity": 25, "position": "low"},
     "S4": {"type": "eye-level", "capacity": 15, "position": "mid"},
     "S5": {"type": "general", "capacity": 20, "position": "mid"},
-    "R1": {"type": "refrigerator", "capacity": 20},  # No position attribute
+    "R1": {"type": "refrigerator", "capacity": 20},
     "H1": {"type": "hazardous", "capacity": 10}
 }
 
@@ -59,7 +59,7 @@ def initialize_population_rule_based(pop_size=50):
         population.append(chromosome)
     return population
 
-# Updated fitness function: skip high-demand penalty for refrigerated products
+# Fitness function: lower score means better fitness (0 is ideal)
 def fitness(chromosome):
     penalty = 0
     for shelf, prod_ids in chromosome.items():
@@ -73,8 +73,7 @@ def fitness(chromosome):
                 penalty += 50
             if prod["storage"] == "hazardous" and shelf != "H1":
                 penalty += 50
-            # Only check high-demand shelf accessibility if product isn't refrigerated
-            if prod["demand"] == "high" and prod["storage"] != "refrigerated":
+            if prod["demand"] == "high":
                 if shelves[shelf].get("position") not in ["high", "mid"]:
                     penalty += 20
             if prod["weight"] > 5 and shelves[shelf].get("position") == "high":
@@ -150,7 +149,7 @@ def mutation(chromosome, mutation_rate=0.1):
 def genetic_algorithm(max_generations=100):
     population = initialize_population_rule_based()
     best_solution = None
-    best_fitness_val = float('inf')
+    best_fitness = float('inf')
     best_generation = 0
     generation_fitnesses = []  # list to store best fitness of each generation
     for generation in range(max_generations):
@@ -158,11 +157,11 @@ def genetic_algorithm(max_generations=100):
         gen_best_fitness = min(fitnesses)
         generation_fitnesses.append((generation, gen_best_fitness))
         for chromo, fit in zip(population, fitnesses):
-            if fit < best_fitness_val:
-                best_fitness_val = fit
+            if fit < best_fitness:
+                best_fitness = fit
                 best_solution = chromo
                 best_generation = generation
-        if best_fitness_val == 0:
+        if best_fitness == 0:
             break
         selected = selection(population, fitnesses)
         next_generation = []
@@ -174,7 +173,7 @@ def genetic_algorithm(max_generations=100):
             child2 = mutation(child2)
             next_generation.extend([child1, child2])
         population = next_generation
-    return best_solution, best_fitness_val, best_generation, generation_fitnesses
+    return best_solution, best_fitness, best_generation, generation_fitnesses
 
 # Export the best solution to Excel
 def export_to_excel(chromosome, filename="optimized_shelf_allocation.xlsx"):
