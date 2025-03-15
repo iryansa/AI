@@ -35,14 +35,21 @@ def initialize_population_rule_based(pop_size=50):
             # Hazardous items go to H1
             elif attr["storage"] == "hazardous":
                 chromosome["H1"].append(p)
-            # High-demand products: Prefer eye-level (S4); if S4 is full, they can go elsewhere
+            # Group Rice Bag, Pasta, and Pasta Sauce together in S2 if possible
+            elif p in {"P2", "P5", "P6"}:
+                current_weight = sum(products[prod]["weight"] for prod in chromosome["S2"])
+                if current_weight + attr["weight"] <= shelves["S2"]["capacity"]:
+                    chromosome["S2"].append(p)
+                else:
+                    chromosome["S5"].append(p)
+            # High-demand products: Prefer eye-level (S4); if S4 is full, then S1
             elif attr["demand"] == "high":
                 total_weight_S4 = sum(products[prod]["weight"] for prod in chromosome["S4"])
                 if total_weight_S4 + attr["weight"] <= shelves["S4"]["capacity"]:
                     chromosome["S4"].append(p)
                 else:
                     chromosome["S1"].append(p)
-            # Heavy items (weight > 5) prefer S2
+            # Heavy items (weight > 5) prefer S2 (but if already grouped above, then this won't apply)
             elif attr["weight"] > 5:
                 chromosome["S2"].append(p)
             # Otherwise, assign to a general shelf (S5)
@@ -71,14 +78,12 @@ def fitness(chromosome):
                     penalty += 20
             if prod["weight"] > 5 and shelves[shelf].get("position") == "high":
                 penalty += 10
-        # Example: Ensure complementary items (P5 and P6) are grouped together
-        if "P5" in prod_ids and "P6" not in prod_ids:
-            penalty += 15
-        if "P6" in prod_ids and "P5" not in prod_ids:
+        # Ensure complementary items (P5 and P6) are grouped together
+        if ("P5" in prod_ids and "P6" not in prod_ids) or ("P6" in prod_ids and "P5" not in prod_ids):
             penalty += 15
     return penalty
 
-# Repair function: ensure each product appears exactly once
+# Repair function: ensure each product appears exactly once in the chromosome
 def repair(chromosome):
     all_products = set(products.keys())
     assigned = []
@@ -140,19 +145,22 @@ def mutation(chromosome, mutation_rate=0.1):
             chromosome = repair(chromosome)
     return chromosome
 
-# GA main loop using the rule-based initialization; tracks and returns the generation number
+# GA main loop using the rule-based initialization; tracks and returns generation fitnesses
 def genetic_algorithm(max_generations=100):
     population = initialize_population_rule_based()
     best_solution = None
     best_fitness = float('inf')
     best_generation = 0
+    generation_fitnesses = []  # list to store best fitness of each generation
     for generation in range(max_generations):
         fitnesses = [fitness(chromo) for chromo in population]
+        gen_best_fitness = min(fitnesses)
+        generation_fitnesses.append((generation, gen_best_fitness))
         for chromo, fit in zip(population, fitnesses):
             if fit < best_fitness:
                 best_fitness = fit
                 best_solution = chromo
-                best_generation = generation  # store generation at which best was found
+                best_generation = generation
         if best_fitness == 0:
             break
         selected = selection(population, fitnesses)
@@ -165,7 +173,7 @@ def genetic_algorithm(max_generations=100):
             child2 = mutation(child2)
             next_generation.extend([child1, child2])
         population = next_generation
-    return best_solution, best_fitness, best_generation
+    return best_solution, best_fitness, best_generation, generation_fitnesses
 
 # Export the best solution to Excel
 def export_to_excel(chromosome, filename="optimized_shelf_allocation.xlsx"):
@@ -185,8 +193,11 @@ def export_to_excel(chromosome, filename="optimized_shelf_allocation.xlsx"):
     df.to_excel(filename, index=False)
 
 # Run the GA and output results
-best_chromosome, best_fit, best_gen = genetic_algorithm()
+best_chromosome, best_fit, best_gen, gen_fitnesses = genetic_algorithm()
 export_to_excel(best_chromosome)
 print("Best Fitness:", best_fit)
 print("Optimized Shelf Allocation:", best_chromosome)
 print("Best found in Generation:", best_gen)
+print("Generation Fitness Progress:")
+for gen, fit in gen_fitnesses:
+    print(f"Generation {gen}: Best Fitness = {fit}")
