@@ -31,6 +31,8 @@ def load_graph(filename):
     
     return graph, heuristics, max_node
 
+
+
 def precompute_two_hop_neighbors(graph):
     """Precompute two-hop neighbors for all nodes."""
     two_hop_neighbors = {}
@@ -45,24 +47,18 @@ def precompute_two_hop_neighbors(graph):
     return two_hop_neighbors
 
 def initial_coloring(graph, two_hop_neighbors, preassigned_colors):
-    """Generate initial valid coloring."""
-    coloring = {}
+    """Generate an initial coloring that strictly prevents adjacent conflicts."""
+    coloring = preassigned_colors.copy()
+    
     # Sort nodes by degree descending
     nodes = sorted(graph.keys(), key=lambda x: (-len(graph[x]), x))
     
     for node in nodes:
         if node in preassigned_colors:
-            coloring[node] = preassigned_colors[node]
             continue
         
-        # Collect used colors from neighbors and two-hop neighbors
-        used_colors = set()
-        for neighbor in graph[node]:
-            if neighbor in coloring:
-                used_colors.add(coloring[neighbor])
-        for neighbor in two_hop_neighbors[node]:
-            if neighbor in coloring:
-                used_colors.add(coloring[neighbor])
+        # Collect used colors from neighbors
+        used_colors = {coloring[neighbor] for neighbor in graph[node] if neighbor in coloring}
         
         # Assign the smallest available color
         color = 0
@@ -71,6 +67,7 @@ def initial_coloring(graph, two_hop_neighbors, preassigned_colors):
         coloring[node] = color
     
     return coloring
+
 
 def heuristic_function(graph, coloring, two_hop_neighbors, heuristics):
     """Evaluate the quality of a coloring."""
@@ -221,3 +218,47 @@ end_time = time.time()
 execution_time = end_time - start_time
 # print the execution time
 print("Execution Time:", execution_time)
+
+def is_valid_coloring(graph, coloring):
+    """Check if the coloring is valid (no two adjacent nodes share the same color)."""
+    for node in graph:
+        for neighbor in graph[node]:
+            if coloring[node] == coloring[neighbor]:
+                print(f"Invalid coloring! Nodes {node} and {neighbor} have the same color {coloring[node]}")
+                return False
+    return True
+
+# Validate the final coloring
+if is_valid_coloring(graph, final_coloring):
+    print("✅ The coloring is valid!")
+else:
+    print("❌ The coloring is incorrect.")
+
+
+import networkx as nx
+import matplotlib.pyplot as plt
+
+def visualize_coloring(graph, coloring):
+    """Visualize the graph with colored nodes."""
+    G = nx.Graph()
+
+    # Add edges
+    for node in graph:
+        for neighbor in graph[node]:
+            G.add_edge(node, neighbor)
+
+    # Define colors for visualization
+    unique_colors = list(set(coloring.values()))
+    color_map = {color: plt.cm.get_cmap("tab10")(i % 10) for i, color in enumerate(unique_colors)}
+
+    # Assign colors to nodes
+    node_colors = [color_map[coloring[node]] for node in G.nodes]
+
+    # Draw the graph
+    plt.figure(figsize=(10, 6))
+    nx.draw(G, with_labels=False, node_color=node_colors, node_size=50, edge_color='gray', font_size=8)
+    plt.title(f"Graph Coloring with {len(unique_colors)} Colors")
+    plt.show()
+
+# Call visualization
+visualize_coloring(graph, final_coloring)
