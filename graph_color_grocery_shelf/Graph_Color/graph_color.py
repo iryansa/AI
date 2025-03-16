@@ -135,7 +135,7 @@ def get_successors(graph, coloring, two_hop_neighbors, preassigned_colors):
     
     return successors
 
-def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations=100):
+def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations=5):
     """Perform local beam search for graph coloring."""
     two_hop_neighbors = precompute_two_hop_neighbors(graph)
     
@@ -208,10 +208,11 @@ final_coloring, num_colors = local_beam_search(graph, heuristics, preassigned_co
 # Print results
 print(f"Solution found with {num_colors} colors")
 print("Final coloring:")
-print("Node\t:\tColor")
+print("Node: Color")
 for node in sorted(final_coloring):
-    print(node, "\t:\t", final_coloring[node])
+    print(node, ": ", final_coloring[node], end=", ")
 
+print("\n")
 # calculate end time
 end_time = time.time()
 # calculate the execution time in seconds
