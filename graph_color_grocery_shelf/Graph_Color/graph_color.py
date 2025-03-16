@@ -135,7 +135,7 @@ def get_successors(graph, coloring, two_hop_neighbors, preassigned_colors):
     
     return successors
 
-def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations=5):
+def local_beam_search(graph, heuristics, preassigned_colors, k=5, max_iterations=100):
     """Perform local beam search for graph coloring."""
     two_hop_neighbors = precompute_two_hop_neighbors(graph)
     
@@ -187,12 +187,26 @@ else:
     max_color = 30  # Default max color for larger graphs
 
 # Generate random preassigned colors
-# num_preassigned = max(1, num_nodes // 10)  # Ensure at least one preassigned color
-# preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), num_preassigned)}
+while True:
+    num_preassigned = max(1, num_nodes // 10)  # Ensure at least one preassigned color
+    preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), num_preassigned)}
+    
+    # Check if any two adjacent nodes have the same preassigned color
+    valid = True
+    for node in preassigned_colors:
+        for neighbor in graph[node]:
+            if neighbor in preassigned_colors and preassigned_colors[node] == preassigned_colors[neighbor]:
+                valid = False
+                break
+        if not valid:
+            break
+    
+    if valid:
+        break
 # print("Preassigned colors:", preassigned_colors)
 
 # Generate random preassigned colors
-preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), min(5, num_nodes))}
+# preassigned_colors = {node: random.randint(0, max_color - 1) for node in random.sample(range(num_nodes), min(5, num_nodes))}
 print("Preassigned colors:", preassigned_colors)
 
 print("Total Vertices:", num_nodes)
